@@ -3,53 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard | Proxy Engine</title>
+    <title>Web Proxy Gateway</title>
     <style>
-        body { font-family: sans-serif; background: #0b0f19; color: #f3f4f6; max-width: 900px; margin: 50px auto; padding: 20px; text-align: center; }
-        h1 { color: #38bdf8; margin-bottom: 5px; }
-        .search-box { margin: 30px 0; }
-        input { width: 70%; padding: 14px; font-size: 16px; border: 2px solid #1e293b; border-radius: 8px; background: #111827; color: white; outline: none; }
-        button { padding: 14px 28px; font-size: 16px; font-weight: bold; background: #0284c7; color: white; border: none; border-radius: 8px; cursor: pointer; margin-left: 10px; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-top: 40px; }
-        .card { background: #111827; padding: 20px; border: 1px solid #1e293b; border-radius: 12px; cursor: pointer; transition: transform 0.2s; }
-        .card:hover { transform: translateY(-5px); border-color: #38bdf8; }
-        .card h3 { margin: 0 0 10px 0; color: #38bdf8; }
-        .card p { margin: 0; font-size: 14px; color: #9ca3af; }
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #0b0f19; font-family: sans-serif; }
+        
+        /* Permanent top bar navigation layout */
+        #proxy-nav-bar { width: 100%; height: 60px; background: #111827; border-bottom: 2px solid #1e293b; display: flex; align-items: center; padding: 0 20px; gap: 15px; position: relative; z-index: 999; }
+        #home-btn { padding: 8px 16px; background: #374151; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #home-btn:hover { background: #4b5563; }
+        #urlInput { flex-grow: 1; padding: 10px; border-radius: 6px; border: 1px solid #334155; background: #1f2937; color: white; font-size: 14px; outline: none; }
+        #urlInput:focus { border-color: #38bdf8; }
+        #launch-btn { padding: 10px 24px; background: #0284c7; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        #launch-btn:hover { background: #0369a1; }
+        
+        /* Content layout canvas */
+        #content-area { width: 100%; height: calc(100% - 60px); position: relative; }
+        iframe { width: 100%; height: 100%; border: none; background: white; }
+        
+        /* Initial dashboard view centered overlay */
+        #dashboard { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: #0b0f19; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px; z-index: 10; }
+        .grid { display: flex; gap: 20px; margin-top: 40px; }
+        .card { background: #111827; padding: 20px 40px; border: 1px solid #1e293b; border-radius: 12px; cursor: pointer; transition: transform 0.2s; text-align: center; }
+        .card:hover { transform: translateY(-3px); border-color: #38bdf8; }
+        .card h3 { margin: 0; color: #38bdf8; }
     </style>
 </head>
 <body>
 
-    <h1>Unrestricted Web Gateway</h1>
-    <p style="color: #6b7280;">Bypasses standard frame controls and connection drops.</p>
-
-    <div class="search-box">
-        <input type="text" id="urlInput" placeholder="Enter site domain (e.g., wikipedia.org)">
-        <button onclick="launch()">Launch</button>
+    <!-- Proxy Header Control Strip -->
+    <div id="proxy-nav-bar">
+        <button id="home-btn" onclick="showDashboard()">🏠 Home</button>
+        <input type="text" id="urlInput" placeholder="Enter website address (e.g., wikipedia.org)">
+        <button id="launch-btn" onclick="handleLaunch()">Go</button>
     </div>
 
-    <div class="grid">
-        <div class="card" onclick="quickLaunch('wikipedia.org')">
-            <h3>Wikipedia</h3>
-            <p>Test layout performance</p>
+    <div id="content-area">
+        <!-- Main Dashboard View Layer -->
+        <div id="dashboard">
+            <h1 style="color: #38bdf8; margin: 0 0 10px 0;">Unrestricted Web Gateway</h1>
+            <p style="color: #9ca3af; margin: 0 0 30px 0;">Type an address above or choose a quick shortcut below.</p>
+            
+            <div class="grid">
+                <div class="card" onclick="quickLaunch('wikipedia.org')">
+                    <h3>Wikipedia</h3>
+                </div>
+                <div class="card" onclick="quickLaunch('example.com')">
+                    <h3>Example Site</h3>
+                </div>
+            </div>
         </div>
-        <div class="card" onclick="quickLaunch('example.com')">
-            <h3>Example Domain</h3>
-            <p>Verify network path</p>
-        </div>
+
+        <!-- Target Web Display Canvas -->
+        <iframe id="proxyFrame" src="about:blank" style="display: none;"></iframe>
     </div>
 
     <script>
-        function launch() {
-            let target = document.getElementById('urlInput').value.trim();
-            if (!target) return alert('Please enter a target site URL');
-            if (!/^https?:\/\//i.test(target)) { target = 'https://' + target; }
-            window.location.href = '/proxy?url=' + encodeURIComponent(target);
+        const frame = document.getElementById('proxyFrame');
+        const dash = document.getElementById('dashboard');
+        const input = document.getElementById('urlInput');
+
+        function handleLaunch() {
+            let target = input.value.trim();
+            if (!target) return alert('Please enter a target URL');
+            
+            if (!/^https?:\/\//i.test(target)) { 
+                target = 'https://' + target; 
+            }
+            
+            // Route the request inside the frame instead of breaking the window tab
+            frame.src = '/proxy?url=' + encodeURIComponent(target);
+            dash.style.display = 'none';
+            frame.style.display = 'block';
         }
-        function quickLaunch(url) {
-            window.location.href = '/proxy?url=' + encodeURIComponent('https://' + url);
+
+        function quickLaunch(domain) {
+            input.value = domain;
+            handleLaunch();
         }
-        document.getElementById('urlInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') launch();
+
+        function showDashboard() {
+            frame.src = "about:blank";
+            frame.style.display = 'none';
+            dash.style.display = 'flex';
+            input.value = '';
+        }
+
+        input.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') handleLaunch();
         });
     </script>
 </body>
