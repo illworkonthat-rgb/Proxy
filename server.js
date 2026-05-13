@@ -20,7 +20,6 @@ app.get('/', (req, res) => {
                 function go() {
                     let t = document.getElementById('url').value.trim();
                     if(t) {
-                        // Automatically add https:// if the user leaves it off
                         if (!/^https?:\\/\\//i.test(t)) {
                             t = 'https://' + t;
                         }
@@ -38,8 +37,7 @@ app.use('/proxy', (req, res, next) => {
     if (!targetUrl) return res.status(400).send('Missing URL');
     
     try {
-        // Backend fallback: Ensure the URL has a valid protocol
-        if (!/^https?:\\/\\//i.test(targetUrl)) {
+        if (!/^https?:\/\//i.test(targetUrl)) {
             targetUrl = 'https://' + targetUrl;
         }
         
