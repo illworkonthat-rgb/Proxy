@@ -7,17 +7,16 @@ const cookieParser = require('cookie-parser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Universal middleware for cookies and permissive routing headers
 app.use(cookieParser());
 app.use(cors({ origin: '*', credentials: true }));
 
-// Serve the landing page asset folder explicitly
+// Express middleware handling landing assets
 app.use(express.static(path.join(__dirname, 'public')));
 
-// The Proxy Gateway Engine
-const handleProxyLogic = (req, res, next, explicitUrl = null) => {
-    let targetUrl = explicitUrl || req.query.url || req.cookies.__active_proxy_target;
-    if (!targetUrl) return res.status(400).send('Missing target routing session context.');
+// Explicit Engine Proxy Handler
+const runProxyEngine = (req, res, next, forcedUrl = null) => {
+    let targetUrl = forcedUrl || req.query.url || req.cookies.__active_proxy_target;
+    if (!targetUrl) return res.status(400).send('Proxy Session Error: No website address supplied.');
 
     if (!/^https?:\/\//i.test(targetUrl)) {
         targetUrl = 'https://' + targetUrl;
@@ -27,17 +26,17 @@ const handleProxyLogic = (req, res, next, explicitUrl = null) => {
     try {
         parsedUrl = new URL(targetUrl);
     } catch (e) {
-        return res.status(400).send('Invalid URL format structural specification.');
+        return res.status(400).send('Proxy Entry Error: Invalid URL structure.');
     }
 
     const targetOrigin = parsedUrl.origin;
 
-    // Track active target domain in a cookie to resolve relative sub-paths seamlessly
+    // Save target origin in a cookie to resolve background assets without infinite loops
     if (req.query.url) {
         res.cookie('__active_proxy_target', targetOrigin, { path: '/', httpOnly: false, sameSite: 'none', secure: true });
     }
 
-    const proxy = createProxyMiddleware({
+    const middlewareInstance = createProxyMiddleware({
         target: targetOrigin,
         changeOrigin: true,
         followRedirects: true,
@@ -50,7 +49,7 @@ const handleProxyLogic = (req, res, next, explicitUrl = null) => {
             proxyReq.setHeader('Accept-Language', 'en-US,en;q=0.9');
             proxyReq.setHeader('Referer', targetOrigin);
             proxyReq.setHeader('Origin', targetOrigin);
-
+            
             proxyReq.removeHeader('x-forwarded-for');
             proxyReq.removeHeader('x-forwarded-proto');
             proxyReq.removeHeader('x-forwarded-host');
@@ -70,33 +69,35 @@ const handleProxyLogic = (req, res, next, explicitUrl = null) => {
         }
     });
 
-    // Reconstruct internal paths for assets that bypass the /proxy endpoint
-    if (!explicitUrl) {
+    if (!forcedUrl) {
         req.url = parsedUrl.pathname + parsedUrl.search;
     }
-    return proxy(req, res, next);
+    return middlewareInstance(req, res, next);
 };
 
-// Explicit router map connection
+// Route mapping configuration
 app.use('/proxy', (req, res, next) => {
-    handleProxyLogic(req, res, next);
+    runProxyEngine(req, res, next);
 });
 
-// Catch-all system to trap and re-route relative background assets (/w/load.php)
+// SERVERLESS LOOP GATEKEEPER: Handles static UI files vs trailing background site assets
 app.use((req, res, next) => {
-    // Let the direct root and landing page assets skip tracking loops
-    if (req.path === '/' || req.path.includes('index.html')) {
+    // Explicitly serve index.html if the path points to root
+    if (req.path === '/' || req.path === '/index.html') {
         return res.sendFile(path.join(__dirname, 'public', 'index.html'));
     }
 
-    const sessionOrigin = req.cookies.__active_proxy_target;
-    if (sessionOrigin) {
-        // Intercept relative asset path breaks and route them through the active proxy session
-        const reconstructedAssetUrl = sessionOrigin + req.originalUrl;
-        return handleProxyLogic(req, res, next, reconstructedAssetUrl);
+    // Direct background assets to the engine only if a proxy session is actively running
+    const activeSessionOrigin = req.cookies.__active_proxy_target;
+    if (activeSessionOrigin && req.path !== '/favicon.ico') {
+        const reconstructedAssetUrl = activeSessionOrigin + req.originalUrl;
+        return runProxyEngine(req, res, next, reconstructedAssetUrl);
     }
     
-    next();
+    // If no active session, send back to landing screen instead of throwing 500 crashes
+    return res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-app.listen(PORT, () => console.log(`Ironclad Engine Live on Port: ${PORT}`));
+// Export the application configuration for Vercel's serverless handler layer
+module.exports = app;
+app.listen(PORT, () => console.log(`Proxy listening on port ${PORT}`));
