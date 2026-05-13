@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const { createProxyMiddleware } = require('http-proxy-middleware');
 const zlib = require('zlib');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -12,48 +13,8 @@ app.use(cors({
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
 }));
 
-app.get('/', (req, res) => {
-    res.send(`
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Ironclad Bypass Proxy</title>
-            <style>
-                body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f172a; color: #f8fafc; max-width: 700px; margin: 80px auto; padding: 20px; text-align: center; }
-                h2 { color: #38bdf8; font-size: 28px; margin-bottom: 20px; }
-                input { width: 80%; padding: 14px; font-size: 16px; border: 2px solid #334155; border-radius: 8px; background: #1e293b; color: white; outline: none; }
-                button { padding: 14px 28px; font-size: 16px; font-weight: bold; cursor: pointer; background: #0284c7; color: white; border: none; border-radius: 8px; margin-top: 15px; }
-                .note { color: #64748b; font-size: 13px; margin-top: 25px; }
-            </style>
-        </head>
-        <body>
-            <h2>Unrestricted Web Proxy</h2>
-            <p style="color: #94a3b8; margin-bottom: 30px;">Bypasses connection refusals, frame walls, and hosting blocks automatically.</p>
-            <input type="text" id="urlInput" placeholder="example.com or https://site.com">
-            <br>
-            <button onclick="navigate()">Launch Site</button>
-            <p class="note">Links, styles, images, and submission routing are rewritten on the fly.</p>
-
-            <script>
-                function navigate() {
-                    let target = document.getElementById('urlInput').value.trim();
-                    if (!target) return alert('Please enter a target URL');
-                    // FIX: Cleaned regex check for the browser environment
-                    if (!/^https?:\\/\\//i.test(target)) {
-                        target = 'https://' + target;
-                    }
-                    window.location.href = '/proxy?url=' + encodeURIComponent(target);
-                }
-                document.getElementById('urlInput').addEventListener('keypress', function(e) {
-                    if (e.key === 'Enter') navigate();
-                });
-            </script>
-        </body>
-        </html>
-    `);
-});
+// CRITICAL LINE: Instructs the engine to serve your index.html and assets from the public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 app.use('/proxy', (req, res, next) => {
     let targetUrl = req.query.url;
@@ -117,7 +78,6 @@ app.use('/proxy', (req, res, next) => {
                     return;
                 }
 
-                // FIX: Full decompression handling including Brotli (br)
                 let decompressedData;
                 try {
                     const encoding = proxyRes.headers['content-encoding'];
@@ -172,8 +132,9 @@ app.use('/proxy', (req, res, next) => {
     return proxy(req, res, next);
 });
 
-app.use((req, res) => {
-    res.redirect('/');
+// Fallback handles route requests by loading the static public root directory index
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 app.listen(PORT, () => console.log(`Ironclad Engine Online on Port: ${PORT}`));
