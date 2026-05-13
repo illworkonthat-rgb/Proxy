@@ -26,7 +26,6 @@ app.use('/proxy', (req, res, next) => {
     }
 
     const targetOrigin = parsedUrl.origin;
-    // Safely deduce the base proxy URL without relying on request headers
     const proxyBaseUrl = `${req.protocol}://${req.get('host')}/proxy?url=`;
 
     const proxy = createProxyMiddleware({
@@ -34,7 +33,7 @@ app.use('/proxy', (req, res, next) => {
         changeOrigin: true,
         followRedirects: true,
         secure: false,
-        selfHandleResponse: true, // Intercept to decompress and fix content loops
+        selfHandleResponse: true, 
 
         onProxyReq: (proxyReq) => {
             proxyReq.setHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36');
@@ -43,7 +42,6 @@ app.use('/proxy', (req, res, next) => {
             proxyReq.setHeader('Referer', targetOrigin);
             proxyReq.setHeader('Origin', targetOrigin);
             
-            // Wipe out cloud headers to prevent loops
             proxyReq.removeHeader('x-forwarded-for');
             proxyReq.removeHeader('x-forwarded-proto');
             proxyReq.removeHeader('x-forwarded-host');
@@ -63,14 +61,12 @@ app.use('/proxy', (req, res, next) => {
                 const buffer = Buffer.concat(chunks);
                 const contentType = proxyRes.headers['content-type'] || '';
 
-                // Instantly pass non-text files (images, audio) to prevent pipeline hangs
                 if (!contentType.includes('text/html') && !contentType.includes('application/javascript') && !contentType.includes('text/css')) {
                     res.writeHead(proxyRes.statusCode, proxyRes.headers);
                     res.end(buffer);
                     return;
                 }
 
-                // Decompress content cleanly
                 let body = '';
                 try {
                     const encoding = proxyRes.headers['content-encoding'];
@@ -82,24 +78,24 @@ app.use('/proxy', (req, res, next) => {
                     body = buffer.toString('utf-8');
                 }
 
-                // FIXED LINK REWRITER: Strict matching patterns to prevent loops on internal files
                 if (contentType.includes('text/html')) {
-                    // Rewrite absolute URLs (https://...)
                     body = body.replace(/(href|src)=["'](https?:\/\/[^"']+)["']/gi, (m, attr, url) => {
                         return `${attr}="${proxyBaseUrl}${encodeURIComponent(url)}"`;
                     });
                     
-                    // Rewrite relative root paths (/style.css) safely without parsing text fragments
                     body = body.replace(/(href|src)=["']\/([^\/][^"']*)["']/gi, (m, attr, path) => {
                         return `${attr}="${proxyBaseUrl}${encodeURIComponent(targetOrigin + '/' + path)}"`;
                     });
                 }
 
                 delete proxyRes.headers['content-encoding'];
-                proxyRes.headers['content-length'] = Buffer.byteLength(body);
+                
+                // Recalculate exact new body byte size manually 
+                proxyRes.headers['content-length'] = Buffer.byteLength(body); 
 
+                // FIX: Write headers first, then deliver with end()
                 res.writeHead(proxyRes.statusCode, proxyRes.headers);
-                res.end(body);
+                res.end(body); 
             });
         },
         onError: (err, req, res) => {
