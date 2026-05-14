@@ -19,13 +19,15 @@ form.addEventListener('submit', async (event) => {
     
     let url = input.value.trim();
     
-    // Basic helper to turn search terms into Google searches
+    // Check if it's a search term or a URL
     if (!url.includes('.') || url.includes(' ')) {
-        url = 'https://www.google.com/search?q=' + encodeURIComponent(url);
+        // Use DuckDuckGo for searches
+        url = 'https://duckduckgo.com/?q=' + encodeURIComponent(url);
     } else if (!(url.startsWith('https://') || url.startsWith('http://'))) {
         url = 'https://' + url;
     }
 
     // Set the location to the Ultraviolet prefixed URL
+    // This encodes the URL so filters don't see "duckduckgo.com"
     window.location.href = __uv$config.prefix + __uv$config.encodeUrl(url);
 });
