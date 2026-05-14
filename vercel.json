@@ -1,9 +1,17 @@
 {
   "version": 2,
-  "builds": [
-    { "src": "server.js", "use": "@vercel/node" }
+  "rewrites": [
+    {
+      "source": "/uv/service/:path*",
+      "destination": "/index.html"
+    }
   ],
-  "routes": [
-    { "src": "/(.*)", "dest": "server.js" }
+  "headers": [
+    {
+      "source": "/uv/(.*)",
+      "headers": [
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    }
   ]
 }
