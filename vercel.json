@@ -10,7 +10,8 @@
     {
       "source": "/uv/(.*)",
       "headers": [
-        { "key": "Service-Worker-Allowed", "value": "/" }
+        { "key": "Service-Worker-Allowed", "value": "/" },
+        { "key": "X-Frame-Options", "value": "ALLOWALL" }
       ]
     }
   ]
